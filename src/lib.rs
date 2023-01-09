@@ -177,7 +177,6 @@ impl Display for Player {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::Rng;
 
     #[test]
     fn test_empty_table() {
