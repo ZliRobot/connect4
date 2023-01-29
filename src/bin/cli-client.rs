@@ -21,6 +21,9 @@ async fn main() -> Result<(), Box<dyn Error>>{
                     players_move = input_move();
                     connection.write_u8(players_move).await.unwrap();
                 };
+                if from_server.trim().contains("won") {
+                    break;
+                }
                 continue;
             }
             Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
@@ -31,6 +34,9 @@ async fn main() -> Result<(), Box<dyn Error>>{
             }
         }
     }
+
+    _ = std::io::stdin().lines();
+    Ok(())
 }
 
 fn input_move() -> u8 {

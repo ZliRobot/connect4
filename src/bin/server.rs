@@ -24,12 +24,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let mut players_move: u8;
             let mut table = Table::new();
 
-            loop {
+            let winner = 'game: loop {
                 PlayersConnection::write_to_both(&mut player1, &mut player2, table.to_string().as_bytes()).await.unwrap();
 
                 for player in [&mut player1, &mut player2] {
 
                     player.write(table.to_string().as_bytes()).await.unwrap();
+
                     player.write(
                         format!("Your turn {}", player.colour)
                         .as_bytes()
@@ -39,8 +40,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                     table.player_played(player.colour, players_move).unwrap();
                     player.write(table.to_string().as_bytes()).await.unwrap();
+
+                    if table.check_for_victory(player.colour) {
+                        break 'game player.colour.clone();
+                    };
                 }
-            }
+            };
+
+            PlayersConnection::write_to_both(
+                &mut player1, 
+                &mut player2, 
+                format!("{} player won!", winner).to_string().as_bytes()).await.unwrap();
         });
     }
 }
