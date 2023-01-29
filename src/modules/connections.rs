@@ -1,11 +1,11 @@
-use tokio::net::TcpStream;
 use crate::Player;
-use tokio::io::{self, AsyncWriteExt, ErrorKind};
 use futures;
+use tokio::io::{self, AsyncWriteExt, ErrorKind};
+use tokio::net::TcpStream;
 
 pub struct PlayersConnection {
     pub socket: TcpStream,
-    pub colour: Player
+    pub colour: Player,
 }
 
 impl PlayersConnection {
@@ -25,11 +25,15 @@ impl PlayersConnection {
         self.socket.write_all(buf).await
     }
 
-    pub async fn write_to_both(player1: &mut Self, player2: &mut Self, bytes: &[u8]) -> io::Result<()> {
-        futures::future::join_all([
-            player1.write(bytes),
-            player2.write(bytes)
-        ]).await.into_iter().collect::<io::Result<()>>()
+    pub async fn write_to_both(
+        player1: &mut Self,
+        player2: &mut Self,
+        bytes: &[u8],
+    ) -> io::Result<()> {
+        futures::future::join_all([player1.write(bytes), player2.write(bytes)])
+            .await
+            .into_iter()
+            .collect::<io::Result<()>>()
     }
 
     pub async fn read_move(&mut self) -> io::Result<u8> {
@@ -46,10 +50,9 @@ impl PlayersConnection {
                     if players_move < 7 {
                         return Ok(players_move);
                     } else {
-                        self.write(
-                            format!("Invalid move. Your turn {}", self.colour)
-                            .as_bytes()
-                        ).await.unwrap();
+                        self.write(format!("Invalid move. Your turn {}", self.colour).as_bytes())
+                            .await
+                            .unwrap();
                         continue;
                     }
                 }
@@ -57,7 +60,7 @@ impl PlayersConnection {
                     continue;
                 }
                 Err(e) => {
-                    return Err(e.into());
+                    return Err(e);
                 }
             }
         }

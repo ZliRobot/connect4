@@ -1,9 +1,9 @@
-use tokio::{net::TcpStream,io::ErrorKind, io::AsyncWriteExt};
 use std::error::Error;
+use tokio::{io::AsyncWriteExt, io::ErrorKind, net::TcpStream};
 use winconsole::console::flush_input;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>>{
+async fn main() -> Result<(), Box<dyn Error>> {
     let mut connection = TcpStream::connect("localhost:8080").await.unwrap();
     let mut from_server: String;
     let mut players_move: u8;

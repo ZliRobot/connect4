@@ -137,7 +137,7 @@ impl Table {
 impl Display for Table {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for row in (0..LEN).rev() {
-            write!(f, "\n")?;
+            writeln!(f)?;
             for column in 0..LEN {
                 write!(
                     f,
@@ -150,7 +150,7 @@ impl Display for Table {
                 )?;
             }
         }
-        write!(f, "\n")?;
+        writeln!(f)?;
         writeln!(f, "0️⃣ 1️⃣ 2️⃣ 3️⃣ 4️⃣ 5️⃣ 6️⃣")
     }
 }
