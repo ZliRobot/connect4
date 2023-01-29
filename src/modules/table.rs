@@ -16,7 +16,8 @@ impl Table {
         }
     }
 
-    pub fn player_played(&mut self, player: Player, column: usize) -> Result<(), String> {
+    pub fn player_played(&mut self, player: Player, column: u8) -> Result<(), String> {
+        let column = column as usize;
         if column >= LEN {
             return Err(format!(
                 "Invalid move. Player can play in columns 0-{}",
