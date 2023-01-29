@@ -1,6 +1,7 @@
 mod modules;
 pub use modules::player::Player;
 pub use modules::table::Table;
+pub use modules::connections::PlayersConnection;
 
 #[cfg(test)]
 mod tests {
