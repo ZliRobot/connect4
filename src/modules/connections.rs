@@ -1,4 +1,4 @@
-use crate::Player;
+use crate::{Player, Table};
 use futures;
 use tokio::io::{self, AsyncWriteExt, ErrorKind};
 use tokio::net::TcpStream;
@@ -65,4 +65,52 @@ impl PlayersConnection {
             }
         }
     }
+}
+
+pub async fn game_handler(
+    mut player1: PlayersConnection,
+    mut player2: PlayersConnection,
+) -> Result<(), String> {
+    let mut players_move: u8;
+    let mut table = Table::new();
+
+    let winner = 'game: loop {
+        PlayersConnection::write_to_both(&mut player1, &mut player2, table.to_string().as_bytes())
+            .await
+            .map_err(|e| format!("{}", e))?;
+
+        for player in [&mut player1, &mut player2] {
+            player
+                .write(table.to_string().as_bytes())
+                .await
+                .map_err(|e| format!("{}", e))?;
+
+            player
+                .write(format!("Your turn {}", player.colour).as_bytes())
+                .await
+                .map_err(|e| format!("{}", e))?;
+
+            players_move = player.read_move().await.map_err(|e| format!("{}", e))?;
+
+            table.player_played(player.colour, players_move)?;
+            player
+                .write(table.to_string().as_bytes())
+                .await
+                .map_err(|e| format!("{}", e))?;
+
+            if table.check_for_victory(player.colour) {
+                break 'game player.colour.clone();
+            };
+        }
+    };
+
+    PlayersConnection::write_to_both(
+        &mut player1,
+        &mut player2,
+        format!("{} player won!", winner).to_string().as_bytes(),
+    )
+    .await
+    .unwrap();
+
+    Ok(())
 }

@@ -1,5 +1,5 @@
 mod modules;
-pub use modules::connections::PlayersConnection;
+pub use modules::connections::{self, PlayersConnection};
 pub use modules::player::Player;
 pub use modules::table::Table;
 
