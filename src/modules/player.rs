@@ -1,6 +1,7 @@
+use serde_derive::{Deserialize, Serialize};
 use std::fmt::Display;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum Player {
     Red,
     Blue,

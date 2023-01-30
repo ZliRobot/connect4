@@ -1,5 +1,7 @@
 use crate::{Player, Table};
 use futures;
+use serde_derive::{Deserialize, Serialize};
+use serde_json;
 use tokio::io::{self, AsyncWriteExt, ErrorKind};
 use tokio::net::TcpStream;
 
@@ -21,22 +23,24 @@ impl PlayersConnection {
         self.socket.readable().await
     }
 
-    pub async fn write(&mut self, buf: &[u8]) -> io::Result<()> {
-        self.socket.write_all(buf).await
+    pub async fn send_message(&mut self, msg: &ServerMessage) -> io::Result<()> {
+        self.socket
+            .write_all(&msg.serialized_bytes().map_err(|_| ErrorKind::InvalidData)?)
+            .await
     }
 
-    pub async fn write_to_both(
+    pub async fn send_message_to_both(
         player1: &mut Self,
         player2: &mut Self,
-        bytes: &[u8],
+        msg: &ServerMessage,
     ) -> io::Result<()> {
-        futures::future::join_all([player1.write(bytes), player2.write(bytes)])
+        futures::future::join_all([player1.send_message(msg), player2.send_message(msg)])
             .await
             .into_iter()
             .collect::<io::Result<()>>()
     }
 
-    pub async fn read_move(&mut self) -> io::Result<u8> {
+    pub async fn read_move_from_player(&mut self) -> io::Result<u8> {
         loop {
             self.readable().await?;
             let mut players_move_buf = [0_u8; 128];
@@ -50,9 +54,8 @@ impl PlayersConnection {
                     if players_move < 7 {
                         return Ok(players_move);
                     } else {
-                        self.write(format!("Invalid move. Your turn {}", self.colour).as_bytes())
-                            .await
-                            .unwrap();
+                        self.send_message(&ServerMessage::InvalidMoveOutOfRange)
+                            .await?;
                         continue;
                     }
                 }
@@ -75,42 +78,71 @@ pub async fn game_handler(
     let mut table = Table::new();
 
     let winner = 'game: loop {
-        PlayersConnection::write_to_both(&mut player1, &mut player2, table.to_string().as_bytes())
-            .await
-            .map_err(|e| format!("{}", e))?;
+        PlayersConnection::send_message_to_both(
+            &mut player1,
+            &mut player2,
+            &ServerMessage::Table(table.clone()),
+        )
+        .await
+        .map_err(|e| format!("{}", e))?;
 
         for player in [&mut player1, &mut player2] {
             player
-                .write(table.to_string().as_bytes())
+                .send_message(&ServerMessage::Table(table.clone()))
                 .await
                 .map_err(|e| format!("{}", e))?;
 
             player
-                .write(format!("Your turn {}", player.colour).as_bytes())
+                .send_message(&ServerMessage::YourTurn)
                 .await
                 .map_err(|e| format!("{}", e))?;
 
-            players_move = player.read_move().await.map_err(|e| format!("{}", e))?;
+            players_move = player
+                .read_move_from_player()
+                .await
+                .map_err(|e| format!("{}", e))?;
 
             table.player_played(player.colour, players_move)?;
             player
-                .write(table.to_string().as_bytes())
+                .send_message(&ServerMessage::Table(table.clone()))
                 .await
                 .map_err(|e| format!("{}", e))?;
 
             if table.check_for_victory(player.colour) {
-                break 'game player.colour.clone();
+                break 'game player.colour;
             };
         }
     };
 
-    PlayersConnection::write_to_both(
+    PlayersConnection::send_message_to_both(
         &mut player1,
         &mut player2,
-        format!("{} player won!", winner).to_string().as_bytes(),
+        &ServerMessage::Victory(winner),
     )
     .await
     .unwrap();
 
     Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum ServerMessage {
+    Table(Table),
+    YourTurn,
+    Victory(Player),
+    InvalidMoveColumnFull,
+    InvalidMoveOutOfRange,
+    Error(String),
+}
+
+impl ServerMessage {
+    pub fn serialized_bytes(&self) -> Result<Vec<u8>, String> {
+        let mut bytes = serde_json::to_string(&self)
+            .map_err(|e| format!("{}", e))?
+            .as_bytes()
+            .to_vec();
+        bytes.push(b'\n');
+
+        Ok(bytes)
+    }
 }

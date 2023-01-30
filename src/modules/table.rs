@@ -1,10 +1,11 @@
 use crate::Player;
+use serde_derive::{Deserialize, Serialize};
 use std::fmt::Display;
 
 pub const LEN: usize = 7;
 pub const FOUR: usize = 4;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct Table {
     pub data: [[Option<Player>; LEN]; LEN],
 }

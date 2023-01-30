@@ -1,36 +1,54 @@
+use connect4::connections::ServerMessage;
 use std::error::Error;
-use tokio::{io::AsyncWriteExt, io::ErrorKind, net::TcpStream};
+use tokio::{
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    net::TcpStream,
+};
 use winconsole::console::flush_input;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let mut connection = TcpStream::connect("localhost:8080").await.unwrap();
-    let mut from_server: String;
+    let (mut reader, mut writer) = connection.split();
+    let mut reader = BufReader::new(&mut reader);
+
+    let mut buf = String::new();
     let mut players_move: u8;
 
     loop {
-        connection.readable().await?;
-        let mut from_server_buf = vec![0_u8; 1024];
-        match connection.try_read(&mut from_server_buf) {
-            Ok(n) => {
-                from_server_buf.truncate(n);
-                from_server = String::from_utf8(from_server_buf.clone()).unwrap();
-                println!("{}", from_server);
+        buf.clear();
+        let n = reader.read_line(&mut buf).await?;
 
-                if from_server.trim().contains("Your turn") {
-                    players_move = input_move();
-                    connection.write_u8(players_move).await.unwrap();
-                };
-                if from_server.trim().contains("won") {
-                    break;
-                }
-                continue;
+        if n == 0 {
+            println!("Connection closed");
+            return Ok(());
+        }
+
+        let message = serde_json::from_str(&buf)?;
+
+        match &message {
+            ServerMessage::Table(table) => {
+                println!("{}", table);
             }
-            Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
-                continue;
+            ServerMessage::YourTurn => {
+                println!("Your turn");
+                players_move = input_move();
+                writer.write_u8(players_move).await?;
             }
-            Err(e) => {
-                return Err(e.into());
+            ServerMessage::Victory(player) => {
+                println!("Player {} won!", player);
+                break;
+            }
+            ServerMessage::InvalidMoveColumnFull => {
+                println!("Column is full, play different column");
+            }
+            ServerMessage::InvalidMoveOutOfRange => {
+                println!("Enter number in range 0-6");
+                players_move = input_move();
+                writer.write_u8(players_move).await?;
+            }
+            ServerMessage::Error(err) => {
+                println!("{}", err);
             }
         }
     }
@@ -43,7 +61,7 @@ fn input_move() -> u8 {
     let mut line = String::new();
     _ = flush_input();
 
-    while line.trim().parse::<usize>().is_err() {
+    while line.trim().parse::<u8>().is_err() {
         line.clear();
         _ = std::io::stdin().read_line(&mut line);
     }
